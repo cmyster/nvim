@@ -1,2 +1,3 @@
-require("config.indents")
+-- Load configs
 require("config.lazy")
+require("config.settings")
