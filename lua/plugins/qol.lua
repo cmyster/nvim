@@ -16,6 +16,7 @@ return {
         { "<leader>e", group = "Explorer" },
         { "<leader>x", group = "Diagnostics" },
         { "<leader>t", group = "Terminal" },
+        { "<leader>h", group = "Help" },
       },
     },
   },
