@@ -87,9 +87,16 @@ return {
       winbar = {
         lualine_c = {
           {
-            "navic",               -- SL-04: winbar breadcrumbs (function/class path)
-            color_correction = nil,
-            navic_opts       = nil,
+            function()
+              local navic = require("nvim-navic")
+              if navic.is_available() then
+                local location = navic.get_location()
+                if location ~= "" then
+                  return location
+                end
+              end
+              return " "  -- keep winbar visible (empty space) to prevent content jumping
+            end,
           },
         },
       },
