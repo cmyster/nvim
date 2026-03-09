@@ -15,7 +15,7 @@ opt.smartindent = true
 opt.scrolloff = 8
 opt.sidescrolloff = 8
 opt.cursorline = true
-opt.colorcolumn = "80"
+opt.colorcolumn = "120"
 opt.signcolumn = "yes"
 opt.wrap = false
 
