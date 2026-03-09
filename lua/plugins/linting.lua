@@ -71,6 +71,14 @@ return {
       --   - Neovim assigns "bash" filetype to files with a #!/bin/bash shebang
       --   Both need shellcheck coverage.
       -- No Rust entry: rust_analyzer LSP provides all Rust diagnostics via vim.lsp.
+      -- Override yamllint args to use config from this nvim directory.
+      -- Default max line-length is 80; our config sets it to 120 to match colorcolumn.
+      lint.linters.yamllint.args = {
+        "-c", vim.fn.stdpath("config") .. "/.yamllint.yaml",
+        "-f", "parsable",
+        "-",
+      }
+
       lint.linters_by_ft = {
         c          = { "cpplint" },
         cpp        = { "cpplint" },
