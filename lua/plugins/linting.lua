@@ -79,6 +79,14 @@ return {
         "-",
       }
 
+      -- cpplint: raise line length limit from 80 to 120.
+      lint.linters.cpplint.args = { "--linelength=120" }
+
+      -- ruff: raise line length limit from 88 (PEP 8) to 120.
+      -- Insert after "check" so the flag precedes stdin/output args.
+      table.insert(lint.linters.ruff.args, 2, "120")
+      table.insert(lint.linters.ruff.args, 2, "--line-length")
+
       lint.linters_by_ft = {
         c          = { "cpplint" },
         cpp        = { "cpplint" },
