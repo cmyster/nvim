@@ -62,6 +62,15 @@ return {
         rust = { "rustfmt" },
       },
 
+      -- Per-formatter overrides applied on top of each formatter's defaults.
+      -- prepend_args are inserted before conform's own positional args.
+      formatters = {
+        -- Force 2-space indentation with spaces (not tabs) for all shell files.
+        shfmt = {
+          prepend_args = { "-i", "2" },
+        },
+      },
+
       -- default_format_opts applies when format() is called without explicit options.
       -- lsp_format = "fallback": use the LSP formatter only when no conform formatter
       -- is configured for the current filetype. NOT "lsp_fallback" — that key was
