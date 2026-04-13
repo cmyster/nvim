@@ -42,7 +42,17 @@ vim.api.nvim_create_autocmd("FileType", {
   end,
 })
 
--- 5. Per-language indentation overrides (4 spaces for Python and Rust)
+-- 5. Enable spell checking for git commit messages
+vim.api.nvim_create_autocmd("FileType", {
+  group = vim.api.nvim_create_augroup("gitcommit_spell", { clear = true }),
+  pattern = "gitcommit",
+  desc = "Enable spell checking for git commit messages",
+  callback = function()
+    vim.opt_local.spell = true
+  end,
+})
+
+-- 6. Per-language indentation overrides (4 spaces for Python and Rust)
 vim.api.nvim_create_autocmd("FileType", {
   group = vim.api.nvim_create_augroup("filetype_indent", { clear = true }),
   pattern = { "python", "rust" },
