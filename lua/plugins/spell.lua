@@ -14,6 +14,7 @@ return {
 
       local popup_win = nil
       local popup_buf = nil
+      local bg_win    = nil
 
       -- getcmdline() works in CmdlineChanged (fires on each keystroke while the
       -- cmdline is open) but returns "" in CmdlineLeave.  Track the last typed
@@ -31,8 +32,12 @@ return {
         if popup_win and vim.api.nvim_win_is_valid(popup_win) then
           pcall(vim.api.nvim_win_close, popup_win, true)
         end
+        if bg_win and vim.api.nvim_win_is_valid(bg_win) then
+          vim.w[bg_win].float_overlay = nil
+        end
         popup_win = nil
         popup_buf = nil
+        bg_win    = nil
       end
 
       local function show_suggestions()
@@ -90,8 +95,10 @@ return {
         end
 
         local orig_win = vim.api.nvim_get_current_win()
+        bg_win = orig_win
 
         popup_buf = vim.api.nvim_create_buf(false, true)
+        vim.b[popup_buf].display_name = "Spell"
         vim.api.nvim_buf_set_lines(popup_buf, 0, -1, false, suggestions)
         vim.bo[popup_buf].bufhidden = "wipe"
         vim.bo[popup_buf].modifiable = false
@@ -105,7 +112,10 @@ return {
           height = #suggestions,
           style = "minimal",
           border = "rounded",
+          title = " Spell ",
+          title_pos = "center",
         })
+        vim.w[bg_win].float_overlay = "Spell"
 
         -- Place cursor on first suggestion
         vim.api.nvim_win_set_cursor(popup_win, { 1, 0 })

@@ -71,7 +71,22 @@ return {
           "diagnostics",                                           -- SL-04 (diag counts; E/W/I/H)
         },
         lualine_c = {
-          { "filename", path = 0, symbols = { modified = " [+]", readonly = " [-]" } },  -- SL-01
+          {
+            function()                                                     -- SL-01 custom filename
+              local ft = vim.bo.filetype
+              if ft == "neo-tree"   then return "Tree"     end
+              if ft == "toggleterm" then return "Terminal" end
+              if vim.b.display_name then return vim.b.display_name end
+              local bufname = vim.api.nvim_buf_get_name(0)
+              if bufname == "Welcome" then return "Welcome" end
+              if bufname == "Spell"   then return "Spell"   end
+              local filename = vim.fn.expand("%:t")
+              if filename == "" then return "[No Name]" end
+              local modified = vim.bo.modified and " [+]" or ""
+              local readonly  = (vim.bo.readonly or not vim.bo.modifiable) and " [-]" or ""
+              return filename .. modified .. readonly
+            end,
+          },
         },
         lualine_x = {
           { "lsp_status", show_name = true, ignore_lsp = {} },    -- SL-03: active LSP server name
@@ -102,7 +117,14 @@ return {
       },
       inactive_winbar = {
         lualine_c = {
-          { "filename", color = { fg = "grey" } },
+          {
+            function()
+              if vim.w.float_overlay    then return vim.w.float_overlay    end
+              if vim.g.active_sidebar   then return vim.g.active_sidebar   end
+              return vim.fn.expand("%:t")
+            end,
+            color = { fg = "grey" },
+          },
         },
       },
     },

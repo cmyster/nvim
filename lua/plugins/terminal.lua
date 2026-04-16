@@ -7,7 +7,13 @@ return {
     "akinsho/toggleterm.nvim",
     version = "*",
     keys = {
-      { "<leader>t", "<cmd>ToggleTerm<CR>", desc = "Toggle terminal" },
+      { "<leader>t", function()
+        -- Floating windows (e.g. spell popup) can't be split — close them first
+        if vim.api.nvim_win_get_config(0).relative ~= "" then
+          vim.api.nvim_win_close(0, false)
+        end
+        vim.cmd("ToggleTerm")
+      end, desc = "Toggle terminal" },
     },
     opts = {
       direction = "horizontal",

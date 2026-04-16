@@ -52,6 +52,18 @@ vim.api.nvim_create_autocmd("FileType", {
   end,
 })
 
+-- 7. Track neo-tree focus so inactive winbars show "Tree" instead of the buffer name
+vim.api.nvim_create_autocmd("BufEnter", {
+  group = vim.api.nvim_create_augroup("neotree_winbar", { clear = true }),
+  callback = function()
+    if vim.bo.filetype == "neo-tree" then
+      vim.g.active_sidebar = "Tree"
+    else
+      vim.g.active_sidebar = nil
+    end
+  end,
+})
+
 -- 6. Per-language indentation overrides (4 spaces for Python and Rust)
 vim.api.nvim_create_autocmd("FileType", {
   group = vim.api.nvim_create_augroup("filetype_indent", { clear = true }),

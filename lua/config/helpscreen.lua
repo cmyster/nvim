@@ -79,6 +79,7 @@ function M.open(auto_close)
 
 	-- Create scratch buffer
 	help_buf = vim.api.nvim_create_buf(false, true)
+	vim.b[help_buf].display_name = "Welcome"
 	vim.api.nvim_buf_set_lines(help_buf, 0, -1, false, lines)
 	vim.bo[help_buf].modifiable = false
 	vim.bo[help_buf].bufhidden = "wipe"
@@ -98,7 +99,7 @@ function M.open(auto_close)
 		col = col,
 		style = "minimal",
 		border = "rounded",
-		title = " Help ",
+		title = " Welcome ",
 		title_pos = "center",
 	})
 
@@ -125,6 +126,8 @@ function M.setup()
 		callback = function()
 			-- Only show when opening nvim with no files (replacing default intro)
 			if vim.fn.argc() == 0 then
+				-- Name the initial empty buffer so the winbar shows "Welcome"
+				vim.api.nvim_buf_set_name(0, "Welcome")
 				-- Defer so the UI is fully drawn
 				vim.defer_fn(function()
 					M.open(true)
