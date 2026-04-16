@@ -144,8 +144,10 @@ return {
       local timer = nil
       local function clear_timer()
         if timer then
-          timer:stop()
-          timer:close()
+          if not timer:is_closing() then
+            timer:stop()
+            timer:close()
+          end
           timer = nil
         end
       end
