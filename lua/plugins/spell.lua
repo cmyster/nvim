@@ -15,9 +15,21 @@ return {
       local popup_win = nil
       local popup_buf = nil
 
+      -- getcmdline() works in CmdlineChanged (fires on each keystroke while the
+      -- cmdline is open) but returns "" in CmdlineLeave.  Track the last typed
+      -- command here so QuitPre can distinguish :q from :qa.
+      local last_cmd = ""
+      vim.api.nvim_create_autocmd("CmdlineChanged", {
+        callback = function()
+          if vim.fn.getcmdtype() == ":" then
+            last_cmd = vim.fn.getcmdline()
+          end
+        end,
+      })
+
       local function close_popup()
         if popup_win and vim.api.nvim_win_is_valid(popup_win) then
-          vim.api.nvim_win_close(popup_win, true)
+          pcall(vim.api.nvim_win_close, popup_win, true)
         end
         popup_win = nil
         popup_buf = nil
@@ -76,6 +88,8 @@ return {
         for _, s in ipairs(suggestions) do
           max_w = math.max(max_w, #s)
         end
+
+        local orig_win = vim.api.nvim_get_current_win()
 
         popup_buf = vim.api.nvim_create_buf(false, true)
         vim.api.nvim_buf_set_lines(popup_buf, 0, -1, false, suggestions)
@@ -137,6 +151,34 @@ return {
           buffer = popup_buf,
           once = true,
           callback = close_popup,
+        })
+
+        -- When :q/:q! fires with the popup focused, close the popup and forward
+        -- the quit to the original editing window.
+        --
+        -- :qa/:qa! walk every window themselves — if we also forward a :q we
+        -- get a duplicate unsaved-change error.  Read last_cmd (set by
+        -- CmdlineChanged above) to tell the two apart and skip forwarding for
+        -- any "quit all" variant.
+        vim.api.nvim_create_autocmd("QuitPre", {
+          buffer = popup_buf,
+          once = true,
+          callback = function()
+            local cmd = last_cmd     -- consume snapshot before scheduling
+            last_cmd = ""
+            -- Any command containing "a" is a quit-all variant (:qa, :qa!, :wqa…)
+            -- Let Neovim handle those without interference.
+            if cmd:match("a") then return end
+            local force = cmd:match("!") and "!" or ""
+            local target = orig_win
+            vim.schedule(function()
+              close_popup()
+              if target and vim.api.nvim_win_is_valid(target) then
+                vim.api.nvim_set_current_win(target)
+              end
+              pcall(vim.cmd, "q" .. force)
+            end)
+          end,
         })
       end
 
