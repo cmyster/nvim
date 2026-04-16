@@ -142,18 +142,23 @@ return {
 
       -- Auto-show suggestions when cursor holds on a misspelled word
       local timer = nil
+      local function clear_timer()
+        if timer then
+          timer:stop()
+          timer:close()
+          timer = nil
+        end
+      end
+
       vim.api.nvim_create_autocmd("CursorHold", {
         callback = function()
           if popup_win then return end
           if not vim.wo.spell then return end
-          if timer then
-            timer:stop()
-            timer = nil
-          end
+          clear_timer()
           -- Only trigger in normal mode for regular buffers
           if vim.fn.mode() ~= "n" then return end
           if vim.bo.buftype ~= "" then return end
-          show_suggestions()
+          timer = vim.defer_fn(show_suggestions, 750)
         end,
       })
 
@@ -164,6 +169,7 @@ return {
           if popup_buf and vim.api.nvim_get_current_buf() == popup_buf then
             return
           end
+          clear_timer()
           close_popup()
         end,
       })
