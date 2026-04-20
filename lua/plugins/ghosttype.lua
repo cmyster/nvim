@@ -1,109 +1,122 @@
 -- lua/plugins/ghosttype.lua
--- AI ghost-text completions via local llama-server + minuet-ai.nvim
+-- AI ghost-text completions via minuet-ai.nvim
 --
--- Provides Copilot-style inline code suggestions powered entirely by local hardware.
--- Uses Qwen2.5-Coder-32B on AMD 7900XTX via ROCm with FIM (fill-in-middle) completions.
+-- Provider hierarchy:
+--   1. LOCAL: AMD ROCm gfx1100 GPU + llama-server + Qwen2.5-Coder-32B model
+--   2. CLAUDE CODE: ANTHROPIC_API_KEY (Claude Haiku) if local is unavailable
+--   3. NONE: plugin disabled if both are unavailable
 --
--- Conditional loading: this plugin only loads when ALL prerequisites are present:
---   1. llama-server binary available
---   2. rocminfo binary available
---   3. gfx1100 GPU detected by rocminfo
---   4. Model file exists at ~/.fakeoid/models/
--- When any prerequisite is missing, lazy.nvim skips the plugin entirely (no install, no load).
+-- Toggle auto-trigger on/off: <leader>tg
 
 local LLAMA_PORT = 8012
 local MODEL_PATH = "~/.fakeoid/models/Qwen2.5-Coder-32B-Instruct-Q4_K_M.gguf"
 
-local function llm_available()
+local function local_available()
   if vim.fn.executable("llama-server") ~= 1 then return false end
   if vim.fn.executable("rocminfo") ~= 1 then return false end
   local rocm_out = vim.fn.system("rocminfo 2>/dev/null | grep -c gfx1100")
   if tonumber(vim.trim(rocm_out)) == 0 then return false end
-  if vim.fn.filereadable(vim.fn.expand(MODEL_PATH)) ~= 1 then return false end
-  return true
+  return vim.fn.filereadable(vim.fn.expand(MODEL_PATH)) == 1
+end
+
+local function claude_available()
+  local ak = vim.fn.getenv("ANTHROPIC_API_KEY")
+  return ak ~= vim.NIL and ak ~= ""
 end
 
 local function is_port_in_use(port)
-  local result = vim.fn.system("ss -tln sport = :" .. port .. " 2>/dev/null | grep -c LISTEN")
-  return tonumber(vim.trim(result)) > 0
+  local r = vim.fn.system("ss -tln sport = :" .. port .. " 2>/dev/null | grep -c LISTEN")
+  return tonumber(vim.trim(r)) > 0
 end
 
 return {
   {
     "milanglacier/minuet-ai.nvim",
     dependencies = { "nvim-lua/plenary.nvim" },
-    cond = llm_available,
+    cond = function()
+      return local_available() or claude_available()
+    end,
     config = function()
-      -- Start llama-server if not already running on the target port.
-      -- If port is in use (e.g., fakeoid started its own llama-server), reuse it.
-      local server_job = nil
-      if not is_port_in_use(LLAMA_PORT) then
-        local model = vim.fn.expand(MODEL_PATH)
-        server_job = vim.fn.jobstart({
-          "llama-server",
-          "--model", model,
-          "--port", tostring(LLAMA_PORT),
-          "-ngl", "99",          -- offload all layers to GPU
-          "--flash-attn", "on",  -- flash attention
-          "-ub", "1024",
-          "-b", "1024",
-          "--ctx-size", "4096",  -- smaller context for completions (not full 32K)
-          "--cache-reuse", "256",
-        }, {
-          on_exit = function(_, code)
-            if code ~= 0 then
-              vim.schedule(function()
-                vim.notify("llama-server exited with code " .. code, vim.log.levels.WARN)
-              end)
-            end
+      local cfg = {
+        throttle = 1000,
+        debounce = 400,
+        n_completions = 1,
+        virtualtext = {
+          auto_trigger_ft = {},  -- empty = all filetypes
+          keymap = {
+            accept      = "<A-A>",  -- accept full suggestion
+            accept_line = "<A-a>",  -- accept single line
+            prev        = "<A-[>",  -- previous suggestion
+            next        = "<A-]>",  -- next suggestion
+            dismiss     = "<A-e>",  -- dismiss
+          },
+        },
+      }
+
+      if local_available() then
+        cfg.request_timeout = 3
+        cfg.provider = "openai_fim_compatible"
+        cfg.provider_options = {
+          openai_fim_compatible = {
+            api_key   = "NONE",
+            end_point = "http://127.0.0.1:" .. LLAMA_PORT .. "/v1/completions",
+            model     = "qwen2.5-coder",
+            name      = "llama-server",
+            optional  = { max_tokens = 128, top_p = 0.9, temperature = 0.2 },
+          },
+        }
+
+        local server_job = nil
+        if not is_port_in_use(LLAMA_PORT) then
+          server_job = vim.fn.jobstart({
+            "llama-server", "--model", vim.fn.expand(MODEL_PATH),
+            "--port", tostring(LLAMA_PORT), "-ngl", "99",
+            "--flash-attn", "on", "-ub", "1024", "-b", "1024",
+            "--ctx-size", "4096", "--cache-reuse", "256",
+          }, {
+            on_exit = function(_, code)
+              if code ~= 0 then
+                vim.schedule(function()
+                  vim.notify("llama-server exited (code " .. code .. ")", vim.log.levels.WARN)
+                end)
+              end
+              server_job = nil
+            end,
+          })
+          if server_job <= 0 then
+            vim.notify("Failed to start llama-server (jobstart=" .. server_job .. ")", vim.log.levels.ERROR)
             server_job = nil
+          end
+        end
+
+        vim.api.nvim_create_autocmd("VimLeavePre", {
+          callback = function()
+            if server_job then vim.fn.jobstop(server_job) end
           end,
         })
-        if server_job <= 0 then
-          vim.notify("Failed to start llama-server (jobstart returned " .. server_job .. ")", vim.log.levels.ERROR)
-          server_job = nil
-        end
+
+      else  -- claude code
+        cfg.request_timeout = 8
+        cfg.provider = "claude"
+        cfg.provider_options = {
+          claude = {
+            api_key    = "ANTHROPIC_API_KEY",
+            model      = "claude-haiku-4-5-20251001",
+            max_tokens = 256,
+            optional   = { temperature = 0.2 },
+          },
+        }
       end
 
-      -- Stop llama-server when neovim exits, but only if this instance started it
-      vim.api.nvim_create_autocmd("VimLeavePre", {
-        callback = function()
-          if server_job then
-            vim.fn.jobstop(server_job)
-          end
-        end,
-      })
+      require("minuet").setup(cfg)
 
-      require("minuet").setup({
-        provider = "openai_fim_compatible",
-        throttle = 1000,       -- ms between requests (GPU-bound, not cost-bound)
-        debounce = 400,        -- ms after typing stops before requesting
-        request_timeout = 3,   -- seconds
-        n_completions = 1,     -- single completion (local model is slower than cloud)
-        virtualtext = {
-          auto_trigger_ft = {}, -- empty = all filetypes
-          keymap = {
-            accept = "<A-A>",       -- Alt-Shift-A: accept full suggestion
-            accept_line = "<A-a>",  -- Alt-a: accept single line
-            prev = "<A-[>",         -- Alt-[: previous suggestion
-            next = "<A-]>",         -- Alt-]: next suggestion
-            dismiss = "<A-e>",      -- Alt-e: dismiss suggestion
-          },
-        },
-        provider_options = {
-          openai_fim_compatible = {
-            api_key = "NONE",  -- local server, no authentication needed
-            end_point = "http://127.0.0.1:" .. LLAMA_PORT .. "/v1/completions",
-            model = "qwen2.5-coder",
-            name = "llama-server",
-            optional = {
-              max_tokens = 128,
-              top_p = 0.9,
-              temperature = 0.2,
-            },
-          },
-        },
-      })
+      vim.g.minuet_ghost_enabled = true
+
+      vim.keymap.set("n", "<leader>tg", function()
+        vim.cmd("Minuet virtualtext toggle")
+        vim.g.minuet_ghost_enabled = not vim.g.minuet_ghost_enabled
+        vim.notify("Ghost typing: " .. (vim.g.minuet_ghost_enabled and "ON" or "OFF"), vim.log.levels.INFO)
+      end, { desc = "Toggle ghost typing" })
     end,
   },
 }

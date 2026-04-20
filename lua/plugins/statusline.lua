@@ -89,6 +89,15 @@ return {
           },
         },
         lualine_x = {
+          {
+            function()
+              if vim.g.minuet_ghost_enabled == nil then return "" end
+              return vim.g.minuet_ghost_enabled and "󰚩 AI" or "󰚩 AI (off)"
+            end,
+            color = function()
+              return { fg = vim.g.minuet_ghost_enabled and "#7dcfff" or "#565f89" }
+            end,
+          },
           { "lsp_status", show_name = true, ignore_lsp = {} },    -- SL-03: active LSP server name
           "filetype",                                              -- SL-01: filetype with icon
         },

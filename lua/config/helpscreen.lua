@@ -42,6 +42,12 @@ local function build_lines()
 		"    ga                Code action (normal + visual)",
 		"    K                 Hover documentation",
 		"",
+		"  AI (ghost typing)",
+		"    <leader>tg        Toggle ghost typing on/off",
+		"    Alt-A             Accept full suggestion",
+		"    Alt-a             Accept suggestion (line)",
+		"    Alt-e             Dismiss suggestion",
+		"",
 		"  OTHER",
 		"    \\                 Toggle file tree (alt)",
 		"",
@@ -86,7 +92,7 @@ function M.open(auto_close)
 
 	-- Calculate centered floating window size
 	local width = 57
-	local height = #lines
+	local height = 25
 	local ui = vim.api.nvim_list_uis()[1]
 	local row = math.floor((ui.height - height) / 2)
 	local col = math.floor((ui.width - width) / 2)
